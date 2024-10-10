@@ -112,7 +112,7 @@ def display_quiz(file_path):
         selected_option = st.radio("Choose an option:", question['options'], key=f"q{st.session_state.current_question}", index=selected_index)
 
         # col1, col2 = st.columns(2)
-        col1, col2, _ = st.columns([1, 1, 4])
+        col1, col2, _ = st.columns([1, 1, 1])
         with col1:
             if st.button("Previous", key="previous_button"):
                 st.session_state.current_question = max(0, st.session_state.current_question - 1)
@@ -146,7 +146,8 @@ def display_quiz(file_path):
             st.markdown("---")
             st.subheader("Review Incorrect Answers:")
             for question, result in incorrect_questions:
-                st.markdown(f"#### Question {question['question_number']}")
+                # st.markdown(f"#### Question {question['question_number']}")
+                st.markdown(f"<h4 style='color: #ff4b4b;'>Question {question['question_number']}</h4>", unsafe_allow_html=True)
                 st.write(question['question'])
                 st.write("Options:")
                 for option in question['options']:
@@ -162,8 +163,14 @@ def display_quiz(file_path):
             st.rerun()
 
 def main():
-    st.set_page_config(page_title="Multiple Choice Quiz App", page_icon=":question:", layout="wide")
-    st.title("Multiple Choice Quiz")
+    if 'quiz_started' not in st.session_state:
+        st.session_state.quiz_started = False
+    
+    # st.set_page_config(page_title="Multiple Choice Quiz App", page_icon=":question:", layout="wide")
+    st.set_page_config(page_title="Multiple Choice Quiz App", page_icon=":question:")
+    
+    if not st.session_state.quiz_started:
+        st.title("Multiple Choice Quiz")
 
     # Start the save thread
     start_save_thread()
@@ -174,6 +181,9 @@ def main():
 
     csv_files = list_csv_files()
 
+    # Display filenames without extensions
+    file_options = [os.path.splitext(f)[0] for f in csv_files]
+
     if not csv_files:
         st.error("No CSV files found in the 'data/' directory of the GitHub repository.")
         return
@@ -181,20 +191,22 @@ def main():
     if 'selected_file' not in st.session_state:
         st.session_state.selected_file = None
 
-    if 'quiz_started' not in st.session_state:
-        st.session_state.quiz_started = False
-
     if not st.session_state.quiz_started:
-        st.session_state.selected_file = st.selectbox("Choose a CSV file", [""] + csv_files)
-
-        if st.session_state.selected_file:
-            file_path = f"data/{st.session_state.selected_file}"
+        if selected_file_no_ext:
+            # Retrieve the full filename (with extension) when selected
+            full_filename = f"{selected_file_no_ext}.csv"
+            file_path = f"data/{full_filename}"
 
             if st.button("Start Quiz", key="start_button"):
+                st.session_state.selected_file = full_filename
                 st.session_state.quiz_started = True
                 st.rerun()
 
     if st.session_state.quiz_started:
+        # Show the selected filename as the title of the quiz
+        selected_file_no_ext = os.path.splitext(st.session_state.selected_file)[0]
+        st.title(f"{selected_file_no_ext} Quiz")
+
         file_path = f"data/{st.session_state.selected_file}"
         display_quiz(file_path)
 
