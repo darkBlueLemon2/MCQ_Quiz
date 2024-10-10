@@ -44,7 +44,7 @@ def save_file_content(filename, content):
     except:
         repo.create_file(f"data/{filename}", f"Create {filename}", content, branch=BRANCH_NAME)
 
-@st.cache_data
+# @st.cache_data
 def load_progress(filename):
     progress_filename = f"{filename}_progress.json"
     content = get_file_content(progress_filename)
@@ -76,7 +76,7 @@ def periodic_save(progress, filename):
         save_progress(progress, filename)
         st.session_state.last_save_time = current_time
 
-@st.cache_data
+#@st.cache_data
 def list_csv_files():
     contents = repo.get_contents("data", ref=BRANCH_NAME)
     return [content.name for content in contents if content.name.endswith('.csv')]
