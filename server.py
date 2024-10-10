@@ -111,7 +111,8 @@ def display_quiz(file_path):
 
         selected_option = st.radio("Choose an option:", question['options'], key=f"q{st.session_state.current_question}", index=selected_index)
 
-        col1, col2 = st.columns(2)
+        # col1, col2 = st.columns(2)
+        col1, col2, _ = st.columns([1, 1, 4])
         with col1:
             if st.button("Previous", key="previous_button"):
                 st.session_state.current_question = max(0, st.session_state.current_question - 1)
