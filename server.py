@@ -72,7 +72,7 @@ def start_save_thread():
 
 def periodic_save(progress, filename):
     current_time = time.time()
-    if current_time - st.session_state.last_save_time > 30:  # Save every 5 minutes
+    if current_time - st.session_state.last_save_time > 0:  # Save every 5 minutes
         save_progress(progress, filename)
         st.session_state.last_save_time = current_time
 
