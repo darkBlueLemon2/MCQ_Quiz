@@ -192,6 +192,9 @@ def main():
         st.session_state.selected_file = None
 
     if not st.session_state.quiz_started:
+        # Present file options without extensions
+        selected_file_no_ext = st.selectbox("Choose a CSV file", [""] + file_options)
+        
         if selected_file_no_ext:
             # Retrieve the full filename (with extension) when selected
             full_filename = f"{selected_file_no_ext}.csv"
