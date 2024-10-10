@@ -2,7 +2,26 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+from github import Github
+from github import Auth
+import base64
+import time
+import threading
+import queue
 
+# GitHub setup
+GITHUB_TOKEN = "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"
+REPO_NAME = "darkBlueLemon2/MCQ_Quiz"
+BRANCH_NAME = "main"
+
+auth = Auth.Token(GITHUB_TOKEN)
+g = Github(auth=auth)
+repo = g.get_repo(REPO_NAME)
+
+# Queue for save operations
+save_queue = queue.Queue()
+
+@st.cache_data
 def load_questions(file):
     df = pd.read_csv(file)
     questions = df.to_dict('records')
@@ -10,20 +29,57 @@ def load_questions(file):
         q['options'] = q['options'].split('|')
     return questions
 
-def save_progress(progress, filename):
-    progress_filename = f"data/{filename}_progress.json"
-    with open(progress_filename, 'w') as f:
-        json.dump(progress, f)
+@st.cache_data
+def get_file_content(filename):
+    try:
+        content = repo.get_contents(f"data/{filename}", ref=BRANCH_NAME)
+        return base64.b64decode(content.content).decode('utf-8')
+    except:
+        return None
 
+def save_file_content(filename, content):
+    try:
+        file = repo.get_contents(f"data/{filename}", ref=BRANCH_NAME)
+        repo.update_file(file.path, f"Update {filename}", content, file.sha, branch=BRANCH_NAME)
+    except:
+        repo.create_file(f"data/{filename}", f"Create {filename}", content, branch=BRANCH_NAME)
+
+@st.cache_data
 def load_progress(filename):
-    progress_filename = f"data/{filename}_progress.json"
-    if os.path.exists(progress_filename):
-        with open(progress_filename, 'r') as f:
-            return json.load(f)
+    progress_filename = f"{filename}_progress.json"
+    content = get_file_content(progress_filename)
+    if content:
+        return json.loads(content)
     return {}
 
-def list_csv_files(directory):
-    return [f for f in os.listdir(directory) if f.endswith('.csv')]
+def save_progress(progress, filename):
+    progress_filename = f"{filename}_progress.json"
+    content = json.dumps(progress)
+    save_queue.put((progress_filename, content))
+
+def save_worker():
+    while True:
+        try:
+            filename, content = save_queue.get(timeout=1)
+            save_file_content(filename, content)
+            save_queue.task_done()
+        except queue.Empty:
+            continue
+
+def start_save_thread():
+    save_thread = threading.Thread(target=save_worker, daemon=True)
+    save_thread.start()
+
+def periodic_save(progress, filename):
+    current_time = time.time()
+    if current_time - st.session_state.last_save_time > 0:  # Save every 5 minutes
+        save_progress(progress, filename)
+        st.session_state.last_save_time = current_time
+
+@st.cache_data
+def list_csv_files():
+    contents = repo.get_contents("data", ref=BRANCH_NAME)
+    return [content.name for content in contents if content.name.endswith('.csv')]
 
 def find_first_unanswered_question(progress, total_questions):
     for i in range(total_questions):
@@ -34,17 +90,19 @@ def find_first_unanswered_question(progress, total_questions):
 def display_quiz(file_path):
     questions = load_questions(file_path)
     filename = os.path.splitext(os.path.basename(file_path))[0]
-    progress = load_progress(filename)
-
+    
+    if 'progress' not in st.session_state:
+        st.session_state.progress = load_progress(filename)
+    
     if 'current_question' not in st.session_state:
-        st.session_state.current_question = find_first_unanswered_question(progress, len(questions))
+        st.session_state.current_question = find_first_unanswered_question(st.session_state.progress, len(questions))
 
     if st.session_state.current_question < len(questions):
         question = questions[st.session_state.current_question]
         st.markdown(f"### Question {question['question_number']}")
         st.write(question['question'])
 
-        current_progress = progress.get(str(st.session_state.current_question), {})
+        current_progress = st.session_state.progress.get(str(st.session_state.current_question), {})
         if current_progress:
             selected_option = current_progress['selected']
             selected_index = question['options'].index(selected_option) if selected_option in question['options'] else None
@@ -60,31 +118,26 @@ def display_quiz(file_path):
                 st.rerun()
         with col2:
             if st.button("Next", key="next_button"):
-                progress[str(st.session_state.current_question)] = {
+                st.session_state.progress[str(st.session_state.current_question)] = {
                     'selected': selected_option,
                 }
-                save_progress(progress, filename)
+                periodic_save(st.session_state.progress, filename)
                 st.session_state.current_question += 1
                 st.rerun()
     else:
-        # st.success("Quiz completed!")
-
-        # Calculate the score
         correct_answers = 0
         total_questions = len(questions)
 
-        for i, (q, result) in enumerate(progress.items()):
+        for i, (q, result) in enumerate(st.session_state.progress.items()):
             question = questions[int(q)]
             if result['selected'] == question['correct_option']:
                 correct_answers += 1
 
-        # Display the score
         st.markdown(f"### Your score: {correct_answers}/{total_questions}")
 
-        # Show only the questions that were answered incorrectly
         incorrect_questions = [
             (questions[int(q)], result)
-            for q, result in progress.items()
+            for q, result in st.session_state.progress.items()
             if result['selected'] != questions[int(q)]['correct_option']
         ]
 
@@ -103,43 +156,45 @@ def display_quiz(file_path):
 
         if st.button("Restart Quiz", key="restart_button"):
             st.session_state.current_question = 0
-            progress_filename = f"data/{filename}_progress.json"
-            if os.path.exists(progress_filename):
-                os.remove(progress_filename)
+            st.session_state.progress = {}
+            save_progress(st.session_state.progress, filename)
             st.rerun()
 
 def main():
     st.set_page_config(page_title="Multiple Choice Quiz App", page_icon=":question:", layout="wide")
     st.title("Multiple Choice Quiz")
 
-    # List CSV files in the data/ directory
-    csv_files = list_csv_files('data')
+    # Start the save thread
+    start_save_thread()
+
+    # Initialize last_save_time
+    if 'last_save_time' not in st.session_state:
+        st.session_state.last_save_time = time.time()
+
+    csv_files = list_csv_files()
 
     if not csv_files:
-        st.error("No CSV files found in the 'data/' directory.")
+        st.error("No CSV files found in the 'data/' directory of the GitHub repository.")
         return
 
-    # Use session state to store the selected file and whether the quiz has started
     if 'selected_file' not in st.session_state:
         st.session_state.selected_file = None
 
     if 'quiz_started' not in st.session_state:
         st.session_state.quiz_started = False
 
-    # If the quiz hasn't started yet, display the selectbox and start button
     if not st.session_state.quiz_started:
         st.session_state.selected_file = st.selectbox("Choose a CSV file", [""] + csv_files)
 
         if st.session_state.selected_file:
-            file_path = os.path.join('data', st.session_state.selected_file)
+            file_path = f"data/{st.session_state.selected_file}"
 
             if st.button("Start Quiz", key="start_button"):
                 st.session_state.quiz_started = True
-                st.rerun()  # Rerun the app to reflect the state change immediately
+                st.rerun()
 
-    # Once the quiz has started, don't show the CSV list or Start Quiz button
     if st.session_state.quiz_started:
-        file_path = os.path.join('data', st.session_state.selected_file)
+        file_path = f"data/{st.session_state.selected_file}"
         display_quiz(file_path)
 
 if __name__ == "__main__":
