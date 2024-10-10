@@ -21,7 +21,7 @@ repo = g.get_repo(REPO_NAME)
 # Queue for save operations
 save_queue = queue.Queue()
 
-@st.cache_data
+# @st.cache_data
 def load_questions(file):
     df = pd.read_csv(file)
     questions = df.to_dict('records')
@@ -29,7 +29,7 @@ def load_questions(file):
         q['options'] = q['options'].split('|')
     return questions
 
-@st.cache_data
+# @st.cache_data
 def get_file_content(filename):
     try:
         content = repo.get_contents(f"data/{filename}", ref=BRANCH_NAME)
