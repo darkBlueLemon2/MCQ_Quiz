@@ -21,7 +21,7 @@ repo = g.get_repo(REPO_NAME)
 # Queue for save operations
 save_queue = queue.Queue()
 
-@st.cache_data
+#@st.cache_data
 def load_questions(file):
     df = pd.read_csv(file)
     questions = df.to_dict('records')
@@ -29,7 +29,7 @@ def load_questions(file):
         q['options'] = q['options'].split('|')
     return questions
 
-@st.cache_data
+#@st.cache_data
 def get_file_content(filename):
     try:
         content = repo.get_contents(f"data/{filename}", ref=BRANCH_NAME)
@@ -44,7 +44,7 @@ def save_file_content(filename, content):
     except:
         repo.create_file(f"data/{filename}", f"Create {filename}", content, branch=BRANCH_NAME)
 
-@st.cache_data
+#@st.cache_data
 def load_progress(filename):
     progress_filename = f"{filename}_progress.json"
     content = get_file_content(progress_filename)
@@ -76,7 +76,7 @@ def periodic_save(progress, filename):
         save_progress(progress, filename)
         st.session_state.last_save_time = current_time
 
-@st.cache_data
+#@st.cache_data
 def list_csv_files():
     contents = repo.get_contents("data", ref=BRANCH_NAME)
     return [content.name for content in contents if content.name.endswith('.csv')]
