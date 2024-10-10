@@ -10,7 +10,7 @@ import threading
 import queue
 
 # GitHub setup
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO_NAME = "darkBlueLemon2/MCQ_Quiz"
 BRANCH_NAME = "main"
 
@@ -72,7 +72,7 @@ def start_save_thread():
 
 def periodic_save(progress, filename):
     current_time = time.time()
-    if current_time - st.session_state.last_save_time > 0:  # Save every 5 minutes
+    if current_time - st.session_state.last_save_time > 300:  # Save every 5 minutes
         save_progress(progress, filename)
         st.session_state.last_save_time = current_time
 
