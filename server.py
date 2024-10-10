@@ -57,7 +57,7 @@ def display_quiz(file_path):
         with col1:
             if st.button("Previous", key="previous_button"):
                 st.session_state.current_question = max(0, st.session_state.current_question - 1)
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("Next", key="next_button"):
                 progress[str(st.session_state.current_question)] = {
@@ -65,7 +65,7 @@ def display_quiz(file_path):
                 }
                 save_progress(progress, filename)
                 st.session_state.current_question += 1
-                st.experimental_rerun()
+                st.rerun()
     else:
         # st.success("Quiz completed!")
 
@@ -106,7 +106,7 @@ def display_quiz(file_path):
             progress_filename = f"data/{filename}_progress.json"
             if os.path.exists(progress_filename):
                 os.remove(progress_filename)
-            st.experimental_rerun()
+            st.rerun()
 
 def main():
     st.set_page_config(page_title="Multiple Choice Quiz App", page_icon=":question:", layout="wide")
@@ -135,7 +135,7 @@ def main():
 
             if st.button("Start Quiz", key="start_button"):
                 st.session_state.quiz_started = True
-                st.experimental_rerun()  # Rerun the app to reflect the state change immediately
+                st.rerun()  # Rerun the app to reflect the state change immediately
 
     # Once the quiz has started, don't show the CSV list or Start Quiz button
     if st.session_state.quiz_started:
